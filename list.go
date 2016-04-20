@@ -8,13 +8,38 @@ import (
 var ListCommand = &cobra.Command{
     Use: "list",
     Aliases: []string{"ls"},
-    Run: ListHandler,
+    Run: ListCommandHandler,
 }
 
-var privateLs bool
+func FilterBookmarks() []*Bookmark {
+    var result []*Bookmark
+    
+    checkIn := func (t string, bt []string) bool {
+        for _, bts := range bt {
+            if t == bts {
+                return true
+            }
+        }
+        return false
+    }
+    
+    if len(tags) == 0 {
+        // Return all Bookmarks if not tags to filter
+        return GetBookmarks(showPrivate)
+    }
+    
+    for _, bookmark := range GetBookmarks(showPrivate) {
+        for _, tag := range tags {
+            if checkIn(tag, bookmark.Tags) {
+                result = append(result, bookmark)                   
+            }
+        }
+    }
+    return result
+}
 
-func ListHandler (cmd *cobra.Command, args []string) {
-    data := GetBookmarks(!privateLs)
+func ListCommandHandler (cmd *cobra.Command, args []string) {
+    data := FilterBookmarks()
     
     for i, bookmark := range data {
         fmt.Println(i, bookmark.Link)
@@ -25,7 +50,3 @@ func ListHandler (cmd *cobra.Command, args []string) {
     }
 }
 
-func InitListCommand(rootCmd *cobra.Command) {
-    rootCmd.AddCommand(ListCommand)
-    ListCommand.Flags().BoolVar(&privateLs, "private", false, "show private")
-}

@@ -8,6 +8,16 @@ import (
     "os"    
 )
 
+// Flag variables
+var (
+    showPrivate bool
+    tags []string
+    group string
+    
+    markPrivate bool
+    filename string
+)
+
 // Bookmark is the Key Model ...
 type Bookmark struct {
     Group string `json:"group"`
@@ -16,7 +26,7 @@ type Bookmark struct {
     Tags []string
 }
 
-var rootCmd = &cobra.Command{
+var GomarkCmd = &cobra.Command{
     Use: "gomark",
     Short: "A Commandline tool to manage bookmarks.",
     Long: `A GoLang-based Commandlinetool to manage bookmarks.`,
@@ -30,8 +40,8 @@ var bookmarks []*Bookmark
 var dataModified = false
 
 // GetBookmarks delivers all bookmarks of current context
-func GetBookmarks(publicOnly bool) []*Bookmark {
-    if !publicOnly {
+func GetBookmarks(showPrivate bool) []*Bookmark {
+    if showPrivate {
         return bookmarks        
     }
     var withoutPrivate []*Bookmark
@@ -43,7 +53,7 @@ func GetBookmarks(publicOnly bool) []*Bookmark {
     return withoutPrivate
 }
 
-func createInitialData (filename string) {
+func CreateInitialData () {
     err := ioutil.WriteFile(filename, []byte("[]"), os.ModePerm)
     if err != nil {
         log.Println("Error creating file:", err)
@@ -52,9 +62,9 @@ func createInitialData (filename string) {
     log.Println("file does not exists. creating", filename)
 }
 
-func readData (filename string) {
+func ReadData () {
     if _, err := os.Stat(filename); err != nil {
-        createInitialData(filename)
+        CreateInitialData()
     }
     file, err := ioutil.ReadFile(filename)
     if err != nil {
@@ -64,7 +74,10 @@ func readData (filename string) {
     json.Unmarshal(file, &bookmarks)
 }
 
-func writeData (filename string) {
+func WriteData () {
+    if !dataModified {
+        return
+    }
     data, err := json.Marshal(bookmarks)
     if err != nil {
         log.Println("Error writing file:", err)
@@ -78,17 +91,33 @@ func AddBookmark(bookmark *Bookmark) {
     dataModified = true
 }
 
+func InitCommands() {
+    
+    GomarkCmd.Flags().StringVarP(&filename, "file", "f", "bookmarks.json", "The bookmarks file. Default: bookmarks.json")    
+    
+    GomarkCmd.AddCommand(AddCommand) 
+    AddCommand.Flags().BoolVarP(&markPrivate, "private", "p", false, "Also show private bookmarks.")
+    AddCommand.Flags().StringSliceVarP(&tags, "tags", "t", []string{}, "tags")
+    AddCommand.Flags().StringVarP(&group, "group", "g", "", "The Bookmark group")
+    AddCommand.Flags().StringVarP(&filename, "file", "f", "bookmarks.json", "The bookmarks file. Default: bookmarks.json")    
+    
+    
+    GomarkCmd.AddCommand(ListCommand)
+    ListCommand.Flags().BoolVarP(&showPrivate, "private", "p", false, "show private")
+    ListCommand.Flags().StringSliceVarP(&tags, "tags", "t", []string{}, "tags")
+    ListCommand.Flags().StringVarP(&filename, "file", "f", "bookmarks.json", "The bookmarks file. Default: bookmarks.json")    
+    
+}
+
 func main () {
-    IntitalizeAddCommand(rootCmd)
-    InitListCommand(rootCmd)
-    readData("bookmarks.json")
     
-    if err := rootCmd.Execute(); err != nil {
+    InitCommands()
+    
+    ReadData()
+    defer WriteData()
+    
+    if err := GomarkCmd.Execute(); err != nil {
         panic(err)       
-    }
-    
-    if dataModified {
-        writeData("bookmarks.json")
     }
     
 }
